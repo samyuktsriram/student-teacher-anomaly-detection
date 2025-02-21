@@ -11,7 +11,8 @@ from AnomalyDataset import AnomalyDataset
 from torchvision import transforms
 from torch.utils.data.dataloader import DataLoader
 from utils import load_model
-
+from PIL import Image
+import os
 
 def parse_arguments():
     parser = ArgumentParser()
@@ -43,7 +44,7 @@ def train(args):
 
     # Loading saved model
     model_name = f'../model/{args.dataset}/resnet18.pt'
-    load_model(resnet18, model_name)
+    #load_model(resnet18, model_name)
 
     # Define optimizer and loss function
     criterion = nn.CrossEntropyLoss()
@@ -52,15 +53,19 @@ def train(args):
                           momentum=args.momentum)
 
     # Load training data
-    dataset = AnomalyDataset(root_dir=f'../data/{args.dataset}/img',
+    dataset = AnomalyDataset(root_dir='/Users/sam/Desktop/X/ens100/data_large_files/input_train',
+                             img_csv='/Users/sam/Desktop/X/ens100/data_large_files/Y_train.csv',
                              transform=transforms.Compose([
                                 transforms.Resize((args.image_size, args.image_size)),
                                 transforms.RandomHorizontalFlip(),
                                 transforms.RandomVerticalFlip(),
                                 transforms.RandomRotation(180),
                                 transforms.ToTensor(),
-                                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]),
-                             type='train')
+                                #transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+                                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+                                ]),
+                             Label=0,
+                             )
     dataloader = DataLoader(dataset, 
                             batch_size=args.batch_size, 
                             shuffle=True, 

@@ -19,16 +19,16 @@ class AnomalyDataset(Dataset):
                       label=0 to filter on anomaly-free data
     '''
 
-    def __init__(self, root_dir, transform=transforms.ToTensor(), gt_transform=transforms.ToTensor(), **constraint):
+    def __init__(self, root_dir, img_csv, transform=transforms.ToTensor(), gt_transform=transforms.ToTensor(), **constraint):
         super(AnomalyDataset, self).__init__()
         self.root_dir = root_dir
         self.transform = transform
         self.gt_transform = gt_transform
-        self.img_dir = os.path.join(self.root_dir, 'img')
         self.gt_dir = os.path.join(self.root_dir, 'ground_truth')
         self.dataset = self.root_dir.split('/')[-1]
-        self.csv_file =  os.path.join(self.root_dir, self.dataset + '.csv')
+        self.csv_file = img_csv
         self.frame_list = self._get_dataset(self.csv_file, constraint)
+        #self.dataframe = pd.read_csv(self.csv_file)
     
     def _get_dataset(self, csv_file, constraint):
         '''Apply filter based on the contraint dict on the dataset'''
@@ -43,24 +43,31 @@ class AnomalyDataset(Dataset):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
-        item = self.frame_list.iloc[idx]
-        img_path = os.path.join(self.img_dir, item['image_name'])
-        label = self.frame_list.iloc[idx]['label']
-        image = Image.open(img_path)
+        # item = self.frame_list.iloc[idx]
+        # img_path = os.path.join(self.img_dir, item['image_name'])
+        # label = self.frame_list.iloc[idx]['label']
+        # image = Image.open(img_path)
+
+        img_name = os.path.join(self.root_dir, self.frame_list.iloc[idx, 1])
+        image = Image.open(img_name).convert("RGB")
+        label = self.frame_list.iloc[idx, -1]
+        # if self.transform:
+        #     image = self.transform(image)
+        #return image, label
  
-        if item['gt_name']:
-            gt_path = os.path.join(self.gt_dir, item['gt_name'])
-            gt = Image.open(gt_path)
-        else:
-            gt = Image.new('L', image.size, color=0)
+        # if item['gt_name']:
+        #     gt_path = os.path.join(self.gt_dir, item['gt_name'])
+        #     gt = Image.open(gt_path)
+        # else:
+        #     gt = Image.new('L', image.size, color=0)
 
         sample = {'label': label}
 
         if self.transform:
             sample['image'] = self.transform(image)
 
-        if self.gt_transform:
-            sample['gt'] = self.gt_transform(gt)
+        # if self.gt_transform:
+        #     sample['gt'] = self.gt_transform(gt)
 
         return sample
 
