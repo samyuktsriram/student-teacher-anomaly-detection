@@ -164,9 +164,11 @@ class AnomalyNet33(pl.LightningModule):
         return y
 
     def forward(self, x, fdfe=False):
+        #fdfe = False
         if fdfe:
             return self.fdfe(x)
         else:
+            #print(x.size())
             assert x.size(2) == self.pH and x.size(3) == self.pW, \
                 f"This patch extractor only accepts input of size (b, 3, {self.pH}, {self.pW})"
             x = self.l_relu(self.conv1(x))

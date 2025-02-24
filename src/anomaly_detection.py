@@ -99,7 +99,7 @@ def get_score_map(inputs, teacher, students, params):
     return score_map
 
 
-def visualize(img, gt, score_map, max_score):
+def visualize(img, gt, score_map, max_score, b):
     plt.figure(figsize=(13, 3))
     plt.subplot(1, 3, 1)
     plt.imshow(img)
@@ -107,7 +107,7 @@ def visualize(img, gt, score_map, max_score):
 
     plt.subplot(1, 3, 2)
     plt.imshow(gt, cmap='gray')
-    plt.title(f'Ground thuth anomaly')
+    plt.title(f'Ground truth anomaly')
 
     plt.subplot(1, 3, 3)
     plt.imshow(score_map, cmap='jet')
@@ -117,12 +117,13 @@ def visualize(img, gt, score_map, max_score):
     plt.title('Anomaly map')
 
     plt.clim(0, max_score)
-    plt.show(block=True)
+    #plt.show(block=True)
+    plt.savefig(f'ens100/teacher_student_results/anomaly_map_{b}.png')
 
 
 def detect_anomaly(args):
     # Choosing device 
-    device = torch.device("cuda:0" if args.gpus else "cpu")
+    device = torch.device("mps") if torch.backends.mps.is_available() else torch.device("cpu")
     print(f'Device used: {device}')
 
     # Teacher network
@@ -130,7 +131,7 @@ def detect_anomaly(args):
     teacher.eval().to(device)
 
     # Load teacher model
-    load_model(teacher, f'../model/{args.dataset}/teacher_{args.patch_size}_net.pt')
+    load_model(teacher, f'/Users/sam/Desktop/X/student-teacher-anomaly-detection/model/teacher_{args.patch_size}.pt')
 
     # Students networks
     students = [AnomalyNet.create((args.patch_size, args.patch_size)) for _ in range(args.n_students)]
@@ -138,17 +139,18 @@ def detect_anomaly(args):
 
     # Loading students models
     for i in range(args.n_students):
-        model_name = f'../model/{args.dataset}/student_{args.patch_size}_net_{i}.pt'
+        model_name = f'/Users/sam/Desktop/X/student-teacher-anomaly-detection/model/student_{args.patch_size}_n{i}.pt'
         load_model(students[i], model_name)
 
     # calibration on anomaly-free dataset
-    calib_dataset = AnomalyDataset(root_dir=f'../data/{args.dataset}',
+    calib_dataset = AnomalyDataset(root_dir='/Users/sam/Desktop/X/ens100/data_large_files/input_train',
+                                    img_csv='/Users/sam/Desktop/X/ens100/data_large_files/Y_train.csv',
                                     transform=transforms.Compose([
                                         transforms.Resize((args.image_size, args.image_size)),
                                         transforms.ToTensor(),
-                                        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]),
-                                    type='train',
-                                    label=0)
+                                        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),]),
+                                    #type='train',
+                                    Label=0)
 
     calib_dataloader = DataLoader(calib_dataset, 
                                    batch_size=args.batch_size, 
@@ -159,15 +161,17 @@ def detect_anomaly(args):
 
 
     # Load testing data
-    test_dataset = AnomalyDataset(root_dir=f'../data/{args.dataset}',
+    test_dataset = AnomalyDataset(root_dir='/Users/sam/Desktop/X/ens100/data_large_files/input_train',
+                                  img_csv='/Users/sam/Desktop/X/ens100/data_large_files/Y_train.csv',
                                   transform=transforms.Compose([
                                     transforms.Resize((args.image_size, args.image_size)),
                                     transforms.ToTensor(),
-                                    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]),
+                                    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),]),
                                   gt_transform=transforms.Compose([
                                     transforms.Resize((args.image_size, args.image_size)),
                                     transforms.ToTensor()]),
-                                  type='test')
+                                  #type='test'
+                                  )
 
     test_dataloader = DataLoader(test_dataset, 
                                  batch_size=args.batch_size, 
@@ -180,6 +184,7 @@ def detect_anomaly(args):
     y_true = np.array([])
     test_iter = iter(test_dataloader)
 
+    #we have some scope here, we need to choose how we want to see our outputs.
     for i in range(args.test_size):
         batch = next(test_iter)
         inputs = batch['image'].to(device)
@@ -190,7 +195,7 @@ def detect_anomaly(args):
         y_true = np.concatenate((y_true, rearrange(gt, 'b c h w -> (b c h w)').numpy()))
 
         if args.visualize:
-            unorm = transforms.Normalize((-1, -1, -1), (2, 2, 2)) # get back to original image
+            unorm = transforms.Normalize((-0.485 / 0.229, -0.456 / 0.224, -0.406 / 0.225), (1 / 0.229, 1 / 0.224, 1 / 0.225)) # get back to original image
             max_score = (params['students']['err']['max'] - params['students']['err']['mu']) / torch.sqrt(params['students']['err']['var'])\
                 + (params['students']['var']['max'] - params['students']['var']['mu']) / torch.sqrt(params['students']['var']['var']).item()
             img_in = rearrange(unorm(inputs).cpu(), 'b c h w -> b h w c')
@@ -200,7 +205,8 @@ def detect_anomaly(args):
                 visualize(img_in[b, :, :, :].squeeze(), 
                           gt_in[b, :, :, :].squeeze(), 
                           score_map[b, :, :].squeeze(), 
-                          max_score)
+                          max_score, 
+                          b)
     
     # AUC ROC
     fpr, tpr, thresholds = roc_curve(y_true.astype(int), y_score)

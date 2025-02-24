@@ -11,7 +11,7 @@ from AnomalyDataset import AnomalyDataset
 from torchvision import transforms
 from torch.utils.data.dataloader import DataLoader
 from utils import load_model
-from PIL import Image
+#from PIL import Image
 import os
 
 def parse_arguments():
@@ -35,7 +35,7 @@ def parse_arguments():
 
 def train(args):
     # Choosing device 
-    device = torch.device("cuda:0" if args.gpus else "cpu")
+    device = torch.device("mps") if torch.backends.mps.is_available() else torch.device("cpu")
     print(f'Device used: {device}')
 
     # Resnet pretrained network for knowledge distillation
@@ -43,7 +43,7 @@ def train(args):
     resnet18.to(device)
 
     # Loading saved model
-    model_name = f'../model/{args.dataset}/resnet18.pt'
+    model_name = f'/Users/sam/Desktop/X/student-teacher-anomaly-detection/model/resnet_no_anom.pt'
     #load_model(resnet18, model_name)
 
     # Define optimizer and loss function
@@ -64,7 +64,7 @@ def train(args):
                                 #transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
                                 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
                                 ]),
-                             Label=0,
+                             #Label=0,
                              )
     dataloader = DataLoader(dataset, 
                             batch_size=args.batch_size, 
@@ -101,7 +101,7 @@ def train(args):
 
         # print stats
         print(f"Epoch {epoch+1}, iter {i+1} \t loss: {running_loss}")
-        accuracy = running_corrects.double() / max_running_corrects
+        accuracy = running_corrects.float() / max_running_corrects
         if running_loss < min_running_loss and epoch > 0:
             torch.save(resnet18.state_dict(), model_name)
             print(f"Loss decreased: {min_running_loss} -> {running_loss}.")

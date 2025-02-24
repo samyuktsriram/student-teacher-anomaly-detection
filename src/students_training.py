@@ -43,7 +43,7 @@ def student_loss(output, target):
 
 def train(args):
     # Choosing device 
-    device = torch.device("cuda:0" if args.gpus else "cpu")
+    device = torch.device("mps") if torch.backends.mps.is_available() else torch.device("cpu")
     print(f'Device used: {device}')
     
     # Teacher network
@@ -51,7 +51,7 @@ def train(args):
     teacher.eval().to(device)
 
     # Load teacher model
-    load_model(teacher, f'../model/{args.dataset}/teacher_{args.patch_size}_net.pt')
+    load_model(teacher, f'/Users/sam/Desktop/X/student-teacher-anomaly-detection/model/teacher_{args.patch_size}.pt')
 
     # Students networks
     students = [AnomalyNet.create((args.patch_size, args.patch_size)) for _ in range(args.n_students)]
@@ -59,8 +59,8 @@ def train(args):
 
     # Loading students models
     for i in range(args.n_students):
-        model_name = f'../model/{args.dataset}/student_{args.patch_size}_net_{i}.pt'
-        load_model(students[i], model_name)
+        model_name = f'/Users/sam/Desktop/X/student-teacher-anomaly-detection/model/student_{args.patch_size}_n{i}.pt'
+        #load_model(students[i], model_name)
 
     # Define optimizer
     optimizers = [optim.Adam(student.parameters(), 
@@ -68,21 +68,22 @@ def train(args):
                             weight_decay=args.weight_decay) for student in students]
 
     # Load anomaly-free training data
-    dataset = AnomalyDataset(root_dir=f'../data/{args.dataset}',
+    dataset = AnomalyDataset(root_dir='/Users/sam/Desktop/X/ens100/data_large_files/input_train',
+                             img_csv='/Users/sam/Desktop/X/ens100/data_large_files/Y_train.csv',
                              transform=transforms.Compose([
                                 transforms.Resize((args.image_size, args.image_size)),
                                 transforms.RandomHorizontalFlip(),
                                 transforms.RandomVerticalFlip(),
                                 transforms.ToTensor(),
-                                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]),
-                             type='train',
-                             label=0)
+                                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),]),
+                             #type='train',
+                             Label=0)
     
 
     # Preprocessing
     # Apply teacher network on anomaly-free dataset
     dataloader = DataLoader(dataset, 
-                            batch_size=args.batch_size, 
+                            batch_size=1, 
                             shuffle=False, 
                             num_workers=args.num_workers)
     print(f'Preprocessing of training dataset {args.dataset}...')
@@ -94,6 +95,7 @@ def train(args):
         for i, batch in tqdm(enumerate(dataloader)):
             inputs = batch['image'].to(device)
             t_out = teacher.fdfe(inputs)
+            #t_out = teacher(inputs)
             t_mu, t_var, N = increment_mean_and_var(t_mu, t_var, N, t_out)
 
     # Training
@@ -104,7 +106,7 @@ def train(args):
 
     for j, student in enumerate(students):
         min_running_loss = np.inf
-        model_name = f'../model/{args.dataset}/student_{args.patch_size}_net_{j}.pt'
+        model_name = f'/Users/sam/Desktop/X/student-teacher-anomaly-detection/model/student_{args.patch_size}_n{j}.pt'
         print(f'Training Student {j} on anomaly-free dataset ...')
 
         for epoch in range(args.max_epochs):

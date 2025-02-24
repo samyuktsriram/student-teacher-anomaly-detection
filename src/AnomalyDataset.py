@@ -28,11 +28,14 @@ class AnomalyDataset(Dataset):
         self.dataset = self.root_dir.split('/')[-1]
         self.csv_file = img_csv
         self.frame_list = self._get_dataset(self.csv_file, constraint)
+        print(self.frame_list['Label'].value_counts())
         #self.dataframe = pd.read_csv(self.csv_file)
     
     def _get_dataset(self, csv_file, constraint):
         '''Apply filter based on the contraint dict on the dataset'''
         df = pd.read_csv(csv_file, keep_default_na=False)
+        #this may not be a smart idea - we lose the original labels. we should try edit the get_item method as well
+        df["Label"] = df["Label"].apply(lambda x: 1 if x > 0 else 0)
         df = df.loc[(df[list(constraint)] == pd.Series(constraint)).all(axis=1)]
         return df
     
@@ -56,18 +59,19 @@ class AnomalyDataset(Dataset):
         #return image, label
  
         # if item['gt_name']:
-        #     gt_path = os.path.join(self.gt_dir, item['gt_name'])
-        #     gt = Image.open(gt_path)
+        #      gt_path = os.path.join(self.gt_dir, item['gt_name'])
+        #      gt = Image.open(gt_path)
         # else:
-        #     gt = Image.new('L', image.size, color=0)
+        #   gt = Image.new('L', image.size, color=0)
 
         sample = {'label': label}
 
         if self.transform:
             sample['image'] = self.transform(image)
 
-        # if self.gt_transform:
-        #     sample['gt'] = self.gt_transform(gt)
+        if self.gt_transform:
+             gt = Image.new('L', image.size, color=0)
+             sample['gt'] = self.gt_transform(gt)
 
         return sample
 

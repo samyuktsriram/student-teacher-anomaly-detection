@@ -55,12 +55,12 @@ def compactness_loss(output):
 
 def train(args):
     # Choosing device 
-    device = torch.device("cuda:0" if args.gpus else "cpu")
+    device = torch.device("mps") if torch.backends.mps.is_available() else torch.device("cpu")
     print(f'Device used: {device}')
 
     # Pretrained network for knowledge distillation
     resnet18 = AnomalyResnet18()
-    resnet_model = f'../model/{args.dataset}/resnet18.pt'
+    resnet_model = f'/Users/sam/Desktop/X/student-teacher-anomaly-detection/model/resnet_no_anom.pt'
     load_model(resnet18, resnet_model)
 
     resnet18 = nn.Sequential(*list(resnet18.children())[:-2])
@@ -71,8 +71,8 @@ def train(args):
     teacher.to(device)
 
     # Loading saved model
-    model_name = f'../model/{args.dataset}/teacher_{args.patch_size}_net.pt'
-    load_model(teacher, model_name)
+    model_name = f'/Users/sam/Desktop/X/student-teacher-anomaly-detection/model/teacher_{args.patch_size}.pt'
+    #load_model(teacher, model_name)
 
     # Define optimizer
     optimizer = optim.Adam(teacher.parameters(),
@@ -80,7 +80,8 @@ def train(args):
                            weight_decay=args.weight_decay)
 
     # Load training data
-    dataset = AnomalyDataset(root_dir=f'../data/{args.dataset}',
+    dataset = AnomalyDataset(root_dir='/Users/sam/Desktop/X/ens100/data_large_files/input_train',
+                             img_csv='/Users/sam/Desktop/X/ens100/data_large_files/Y_train.csv',
                              transform=transforms.Compose([
                                 transforms.Resize((args.image_size, args.image_size)),
                                 transforms.RandomCrop((args.patch_size, args.patch_size)),
@@ -88,8 +89,10 @@ def train(args):
                                 transforms.RandomVerticalFlip(),
                                 transforms.RandomRotation(180),
                                 transforms.ToTensor(),
-                                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]),
-                             type='train')
+                                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+                             ],
+                             #type='train'
+                             ))
     dataloader = DataLoader(dataset, 
                             batch_size=args.batch_size,
                             shuffle=True, 
