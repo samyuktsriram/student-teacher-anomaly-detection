@@ -11,7 +11,7 @@ from AnomalyDataset import AnomalyDataset
 from torchvision import transforms
 from torch.utils.data.dataloader import DataLoader
 from utils import load_model
-#from PIL import Image
+from PIL import Image
 import os
 
 def parse_arguments():
@@ -43,7 +43,7 @@ def train(args):
     resnet18.to(device)
 
     # Loading saved model
-    model_name = f'/Users/sam/Desktop/X/student-teacher-anomaly-detection/model/resnet_no_anom.pt'
+    model_name = f'/Users/sam/Desktop/X/student-teacher-anomaly-detection/model/resnet_no_anom_unrotated.pt'
     #load_model(resnet18, model_name)
 
     # Define optimizer and loss function
@@ -53,9 +53,11 @@ def train(args):
                           momentum=args.momentum)
 
     # Load training data
-    dataset = AnomalyDataset(root_dir='/Users/sam/Desktop/X/ens100/data_large_files/input_train',
+    dataset = AnomalyDataset(root_dir=args.dataset,
                              img_csv='/Users/sam/Desktop/X/ens100/data_large_files/Y_train.csv',
                              transform=transforms.Compose([
+                                #transforms.contiguous(),
+                                #transforms.Lambda(lambda img: to_pil_image(img)),
                                 transforms.Resize((args.image_size, args.image_size)),
                                 transforms.RandomHorizontalFlip(),
                                 transforms.RandomVerticalFlip(),

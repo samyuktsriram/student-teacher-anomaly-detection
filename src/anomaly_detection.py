@@ -99,15 +99,16 @@ def get_score_map(inputs, teacher, students, params):
     return score_map
 
 
-def visualize(img, gt, score_map, max_score, b):
+def visualize(img, #gt, 
+              score_map, max_score, b, label):
     plt.figure(figsize=(13, 3))
     plt.subplot(1, 3, 1)
     plt.imshow(img)
     plt.title(f'Original image')
 
     plt.subplot(1, 3, 2)
-    plt.imshow(gt, cmap='gray')
-    plt.title(f'Ground truth anomaly')
+    #plt.imshow(gt, cmap='gray')
+    plt.title(f'Ground truth - {label}')
 
     plt.subplot(1, 3, 3)
     plt.imshow(score_map, cmap='jet')
@@ -118,7 +119,7 @@ def visualize(img, gt, score_map, max_score, b):
 
     plt.clim(0, max_score)
     #plt.show(block=True)
-    plt.savefig(f'ens100/teacher_student_results/anomaly_map_{b}.png')
+    plt.savefig(f'ens100/teacher_student_results/anomaly_map_{b}_unrotated.png')
 
 
 def detect_anomaly(args):
@@ -131,7 +132,7 @@ def detect_anomaly(args):
     teacher.eval().to(device)
 
     # Load teacher model
-    load_model(teacher, f'/Users/sam/Desktop/X/student-teacher-anomaly-detection/model/teacher_{args.patch_size}.pt')
+    load_model(teacher, f'/Users/sam/Desktop/X/student-teacher-anomaly-detection/model/teacher_{args.patch_size}_unrotated.pt')
 
     # Students networks
     students = [AnomalyNet.create((args.patch_size, args.patch_size)) for _ in range(args.n_students)]
@@ -139,11 +140,11 @@ def detect_anomaly(args):
 
     # Loading students models
     for i in range(args.n_students):
-        model_name = f'/Users/sam/Desktop/X/student-teacher-anomaly-detection/model/student_{args.patch_size}_n{i}.pt'
+        model_name = f'/Users/sam/Desktop/X/student-teacher-anomaly-detection/model/student_{args.patch_size}_n{i}_unrotated.pt'
         load_model(students[i], model_name)
 
     # calibration on anomaly-free dataset
-    calib_dataset = AnomalyDataset(root_dir='/Users/sam/Desktop/X/ens100/data_large_files/input_train',
+    calib_dataset = AnomalyDataset(root_dir=args.dataset,
                                     img_csv='/Users/sam/Desktop/X/ens100/data_large_files/Y_train.csv',
                                     transform=transforms.Compose([
                                         transforms.Resize((args.image_size, args.image_size)),
@@ -161,15 +162,15 @@ def detect_anomaly(args):
 
 
     # Load testing data
-    test_dataset = AnomalyDataset(root_dir='/Users/sam/Desktop/X/ens100/data_large_files/input_train',
+    test_dataset = AnomalyDataset(root_dir='/Users/sam/Desktop/X/ens100/data_large_files/input_train_unrotated/input_train',
                                   img_csv='/Users/sam/Desktop/X/ens100/data_large_files/Y_train.csv',
                                   transform=transforms.Compose([
                                     transforms.Resize((args.image_size, args.image_size)),
                                     transforms.ToTensor(),
                                     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),]),
-                                  gt_transform=transforms.Compose([
-                                    transforms.Resize((args.image_size, args.image_size)),
-                                    transforms.ToTensor()]),
+                                  #gt_transform=transforms.Compose([
+                                    #transforms.Resize((args.image_size, args.image_size)),
+                                    #transforms.ToTensor()]),
                                   #type='test'
                                   )
 
@@ -188,37 +189,38 @@ def detect_anomaly(args):
     for i in range(args.test_size):
         batch = next(test_iter)
         inputs = batch['image'].to(device)
-        gt = batch['gt'].cpu()
+        #gt = batch['gt'].cpu()
 
         score_map = get_score_map(inputs, teacher, students, params).cpu()
         y_score = np.concatenate((y_score, rearrange(score_map, 'b h w -> (b h w)').numpy()))
-        y_true = np.concatenate((y_true, rearrange(gt, 'b c h w -> (b c h w)').numpy()))
+        #y_true = np.concatenate((y_true, rearrange(gt, 'b c h w -> (b c h w)').numpy()))
 
         if args.visualize:
             unorm = transforms.Normalize((-0.485 / 0.229, -0.456 / 0.224, -0.406 / 0.225), (1 / 0.229, 1 / 0.224, 1 / 0.225)) # get back to original image
             max_score = (params['students']['err']['max'] - params['students']['err']['mu']) / torch.sqrt(params['students']['err']['var'])\
                 + (params['students']['var']['max'] - params['students']['var']['mu']) / torch.sqrt(params['students']['var']['var']).item()
             img_in = rearrange(unorm(inputs).cpu(), 'b c h w -> b h w c')
-            gt_in = rearrange(gt, 'b c h w -> b h w c')
+            #gt_in = rearrange(gt, 'b c h w -> b h w c')
 
             for b in range(args.batch_size):
                 visualize(img_in[b, :, :, :].squeeze(), 
-                          gt_in[b, :, :, :].squeeze(), 
+                          #gt_in[b, :, :, :].squeeze(), 
                           score_map[b, :, :].squeeze(), 
                           max_score, 
-                          b)
+                          i,
+                          batch['label'])
     
     # AUC ROC
-    fpr, tpr, thresholds = roc_curve(y_true.astype(int), y_score)
-    plt.figure(figsize=(13, 3))
-    plt.plot(fpr, tpr, 'r', label="ROC")
-    plt.plot(fpr, fpr, 'b', label="random")
-    plt.title(f'ROC AUC: {auc(fpr, tpr)}')
-    plt.xlabel('FPR')
-    plt.ylabel('TPR')
-    plt.legend()
-    plt.grid()
-    plt.show()
+    # fpr, tpr, thresholds = roc_curve(y_true.astype(int), y_score)
+    # plt.figure(figsize=(13, 3))
+    # plt.plot(fpr, tpr, 'r', label="ROC")
+    # plt.plot(fpr, fpr, 'b', label="random")
+    # plt.title(f'ROC AUC: {auc(fpr, tpr)}')
+    # plt.xlabel('FPR')
+    # plt.ylabel('TPR')
+    # plt.legend()
+    # plt.grid()
+    #plt.show()
 
 
 if __name__ == '__main__':

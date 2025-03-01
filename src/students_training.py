@@ -51,7 +51,7 @@ def train(args):
     teacher.eval().to(device)
 
     # Load teacher model
-    load_model(teacher, f'/Users/sam/Desktop/X/student-teacher-anomaly-detection/model/teacher_{args.patch_size}.pt')
+    load_model(teacher, f'/Users/sam/Desktop/X/student-teacher-anomaly-detection/model/teacher_{args.patch_size}_unrotated.pt')
 
     # Students networks
     students = [AnomalyNet.create((args.patch_size, args.patch_size)) for _ in range(args.n_students)]
@@ -59,7 +59,7 @@ def train(args):
 
     # Loading students models
     for i in range(args.n_students):
-        model_name = f'/Users/sam/Desktop/X/student-teacher-anomaly-detection/model/student_{args.patch_size}_n{i}.pt'
+        model_name = f'/Users/sam/Desktop/X/student-teacher-anomaly-detection/model/student_{args.patch_size}_n{i}_unrotated.pt'
         #load_model(students[i], model_name)
 
     # Define optimizer
@@ -68,7 +68,7 @@ def train(args):
                             weight_decay=args.weight_decay) for student in students]
 
     # Load anomaly-free training data
-    dataset = AnomalyDataset(root_dir='/Users/sam/Desktop/X/ens100/data_large_files/input_train',
+    dataset = AnomalyDataset(root_dir=args.dataset,
                              img_csv='/Users/sam/Desktop/X/ens100/data_large_files/Y_train.csv',
                              transform=transforms.Compose([
                                 transforms.Resize((args.image_size, args.image_size)),
@@ -106,7 +106,7 @@ def train(args):
 
     for j, student in enumerate(students):
         min_running_loss = np.inf
-        model_name = f'/Users/sam/Desktop/X/student-teacher-anomaly-detection/model/student_{args.patch_size}_n{j}.pt'
+        model_name = f'/Users/sam/Desktop/X/student-teacher-anomaly-detection/model/student_{args.patch_size}_n{j}_unrotated.pt'
         print(f'Training Student {j} on anomaly-free dataset ...')
 
         for epoch in range(args.max_epochs):

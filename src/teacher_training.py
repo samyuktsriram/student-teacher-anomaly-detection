@@ -60,7 +60,7 @@ def train(args):
 
     # Pretrained network for knowledge distillation
     resnet18 = AnomalyResnet18()
-    resnet_model = f'/Users/sam/Desktop/X/student-teacher-anomaly-detection/model/resnet_no_anom.pt'
+    resnet_model = f'/Users/sam/Desktop/X/student-teacher-anomaly-detection/model/resnet_no_anom_unrotated.pt'
     load_model(resnet18, resnet_model)
 
     resnet18 = nn.Sequential(*list(resnet18.children())[:-2])
@@ -71,7 +71,7 @@ def train(args):
     teacher.to(device)
 
     # Loading saved model
-    model_name = f'/Users/sam/Desktop/X/student-teacher-anomaly-detection/model/teacher_{args.patch_size}.pt'
+    model_name = f'/Users/sam/Desktop/X/student-teacher-anomaly-detection/model/teacher_{args.patch_size}_unrotated.pt'
     #load_model(teacher, model_name)
 
     # Define optimizer
@@ -80,7 +80,7 @@ def train(args):
                            weight_decay=args.weight_decay)
 
     # Load training data
-    dataset = AnomalyDataset(root_dir='/Users/sam/Desktop/X/ens100/data_large_files/input_train',
+    dataset = AnomalyDataset(root_dir=args.dataset,
                              img_csv='/Users/sam/Desktop/X/ens100/data_large_files/Y_train.csv',
                              transform=transforms.Compose([
                                 transforms.Resize((args.image_size, args.image_size)),

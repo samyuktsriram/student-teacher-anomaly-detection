@@ -69,9 +69,9 @@ class AnomalyDataset(Dataset):
         if self.transform:
             sample['image'] = self.transform(image)
 
-        if self.gt_transform:
-             gt = Image.new('L', image.size, color=0)
-             sample['gt'] = self.gt_transform(gt)
+        #if self.gt_transform:
+        #     gt = Image.new('L', image.size, color=0)
+        #     sample['gt'] = self.gt_transform(gt)
 
         return sample
 
