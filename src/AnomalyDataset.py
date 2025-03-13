@@ -65,7 +65,7 @@ class AnomalyDataset(Dataset):
         #   gt = Image.new('L', image.size, color=0)
 
         sample = {'label': label}
-
+        sample['path'] = img_name
         if self.transform:
             sample['image'] = self.transform(image)
 

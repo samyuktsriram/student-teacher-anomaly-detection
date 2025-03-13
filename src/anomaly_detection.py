@@ -10,6 +10,9 @@ from torchvision import transforms
 from torch.utils.data.dataloader import DataLoader
 from utils import increment_mean_and_var, load_model
 from sklearn.metrics import roc_curve, auc
+from PIL import Image
+import os
+import csv
 
 
 def parse_arguments():
@@ -108,7 +111,7 @@ def visualize(img, #gt,
 
     plt.subplot(1, 3, 2)
     #plt.imshow(gt, cmap='gray')
-    plt.title(f'Ground truth - {label}')
+    plt.title(f'Ground truth - {label.item()}')
 
     plt.subplot(1, 3, 3)
     plt.imshow(score_map, cmap='jet')
@@ -120,6 +123,47 @@ def visualize(img, #gt,
     plt.clim(0, max_score)
     #plt.show(block=True)
     plt.savefig(f'ens100/teacher_student_results/anomaly_map_{b}_unrotated.png')
+
+def save_the_image(img_full, score_map, paths, labels, batch_size):
+    #new_image_np = np.dstack((img, score_map))  # Shape: (256, 256, 4)
+
+    # Convert back to an image and save
+    #new_image = Image.fromarray(new_image_np, mode="RGBA")  # Save as RGBA
+    #path = "/Users/sam/Desktop/X/ens100/data_large_files/more_ch{b}.png"
+    #new_image.save(f"/Users/sam/Desktop/X/ens100/data_large_files/more_ch{b}.png")
+
+    # Define the CSV file path
+    csv_filename = "/Users/sam/Desktop/X/ens100/data_large_files/multichannel.csv"
+    output_folder = "/Users/sam/Desktop/X/ens100/data_large_files/score_image/"
+    os.makedirs(output_folder, exist_ok=True)
+
+    # Check if the CSV exists to write headers only once
+    write_header = not os.path.exists(csv_filename)
+
+    # Open CSV in append mode
+    with open(csv_filename, mode="a", newline="") as file:
+        writer = csv.writer(file)
+        
+        # Write header only if the file is new
+        if write_header:
+            writer.writerow(["path", 'Label'])  
+
+        # Loop through each image in the batch
+        for i, (combined_img, str_list, label) in enumerate(zip(score_map, paths, labels)):
+            # Normalize and save the image
+            #img = ((score_map - score_map.min()) / (score_map.max() - score_map.min()) * 255).astype(np.uint8)
+            print(score_map.shape)
+            print(type(score_map))
+            img = score_map.cpu().numpy()
+            image = Image.fromarray(img, mode="L")  # Save as L (grayscale)
+            output_folder = "/Users/sam/Desktop/X/ens100/data_large_files/score_image/"
+            image_path = os.path.join(output_folder, os.path.basename(str_list))
+            image.save(image_path)
+
+            # Append row to CSV
+            writer.writerow([image_path, label.item()])  # Store list as a semicolon-separated string
+
+    print(f"Saved {batch_size} images to {image_path} and updated '{csv_filename}'")
 
 
 def detect_anomaly(args):
@@ -186,7 +230,8 @@ def detect_anomaly(args):
     test_iter = iter(test_dataloader)
 
     #we have some scope here, we need to choose how we want to see our outputs.
-    for i in range(args.test_size):
+    #for i in range(args.test_size):
+    for i in range(len(test_dataloader)):
         batch = next(test_iter)
         inputs = batch['image'].to(device)
         #gt = batch['gt'].cpu()
@@ -203,13 +248,13 @@ def detect_anomaly(args):
             #gt_in = rearrange(gt, 'b c h w -> b h w c')
 
             for b in range(args.batch_size):
-                visualize(img_in[b, :, :, :].squeeze(), 
-                          #gt_in[b, :, :, :].squeeze(), 
-                          score_map[b, :, :].squeeze(), 
-                          max_score, 
-                          i,
-                          batch['label'])
-    
+            #     visualize(img_in[b, :, :, :].squeeze(), 
+            #               #gt_in[b, :, :, :].squeeze(), 
+            #               score_map[b, :, :].squeeze(), 
+            #               max_score, 
+            #               i,
+            #               batch['label'])
+                save_the_image(img_in[b, :, :, :].squeeze(), score_map[b, :, :].squeeze(), batch['path'], batch['label'], args.batch_size)
     # AUC ROC
     # fpr, tpr, thresholds = roc_curve(y_true.astype(int), y_score)
     # plt.figure(figsize=(13, 3))
@@ -221,6 +266,11 @@ def detect_anomaly(args):
     # plt.legend()
     # plt.grid()
     #plt.show()
+    # print(y_score)
+    # print(y_score.shape)
+    # print(np.max(y_score))
+    # print(np.min(y_score))
+    # y_score.reshape(50, 256, 256)
 
 
 if __name__ == '__main__':
